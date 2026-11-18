@@ -47,7 +47,7 @@ docker compose up -d --build
 
 Na primeira subida o Airflow executa o DAG sozinho (ingestão, `dbt seed`, `dbt run`,
 `dbt test`) e, quando o mart existe, o serviço `superset-bootstrap` cria a conexão, o
-dataset, os seis gráficos e o dashboard pela API do Superset.
+dataset, os oito gráficos e o dashboard pela API do Superset.
 
 | Serviço | Endereço | Acesso |
 | --- | --- | --- |
@@ -89,6 +89,9 @@ uv run ruff check .
   conflitam com as do Airflow.
 - **Dashboard como código.** Os gráficos são criados pela API REST do Superset, com
   tipos nativos, e o script pode ser executado mais de uma vez.
+- **Visual do dashboard em CSS.** Uma cor por região em todos os gráficos, KPIs
+  centralizados com fonte que acompanha a largura da tela e, abaixo de 900 px, os
+  gráficos empilham e são ampliados para ocupar a largura.
 - **Qualidade de dados no dbt.** Testes de chave única, integridade entre fato e
   dimensão, valores aceitos, taxa entre 0 e 100 e presença das 27 UFs.
 
@@ -99,6 +102,9 @@ uv run ruff check .
 - Um único Postgres guarda o warehouse e os metadados do Airflow e do Superset. Serve
   para demonstração, não para produção.
 - O Airflow roda em modo `standalone`, sem autenticação.
+- O layout foi conferido em 1500 px e 820 px de largura. Em celular o Superset usa a
+  largura de página de desktop e o navegador apenas reduz a escala; não testei em um
+  aparelho real.
 - O workflow de CI (`.github/workflows/ci.yml`) está escrito, mas ainda não foi executado
   no GitHub.
 - Catálogo de dados (Amundsen) ainda não faz parte do projeto. Enquanto isso, a
