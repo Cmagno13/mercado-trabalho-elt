@@ -132,8 +132,6 @@ uv run ruff check .
 - O layout foi conferido em 1500 px e 820 px de largura. Em celular o Superset usa a
   largura de página de desktop e o navegador apenas reduz a escala; não testei em um
   aparelho real.
-- O workflow de CI (`.github/workflows/ci.yml`) está escrito, mas ainda não foi executado
-  no GitHub.
 - No Amundsen, só as colunas descritas no dbt aparecem com descrição, e a carga do
   catálogo é manual (não é uma tarefa do DAG).
 
