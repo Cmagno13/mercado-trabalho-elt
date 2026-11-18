@@ -29,4 +29,13 @@ with DAG(
     dbt_run = BashOperator(task_id="dbt_run", bash_command=f"{DBT} run {DBT_FLAGS}")
     dbt_test = BashOperator(task_id="dbt_test", bash_command=f"{DBT} test {DBT_FLAGS}")
 
-    ingerir_sidra() >> dbt_seed >> dbt_run >> dbt_test
+    # manifest.json e catalog.json: documentação do dbt e entrada do catálogo (Amundsen)
+    dbt_docs = BashOperator(
+        task_id="dbt_docs",
+        bash_command=(
+            f"{DBT} docs generate --profiles-dir . --log-path /tmp/dbt-logs "
+            "--target-path /opt/airflow/dbt-artifacts"
+        ),
+    )
+
+    ingerir_sidra() >> dbt_seed >> dbt_run >> dbt_test >> dbt_docs

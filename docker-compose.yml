@@ -43,6 +43,7 @@ services:
       - ./dags:/opt/airflow/dags:ro
       - ./ingestion:/opt/project/ingestion:ro
       - ./dbt:/opt/project/dbt:ro
+      - dbt_artifacts:/opt/airflow/dbt-artifacts
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,3 +95,4 @@ services:
 
 volumes:
   pgdata:
+  dbt_artifacts:

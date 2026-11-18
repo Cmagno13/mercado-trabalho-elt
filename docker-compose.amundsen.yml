@@ -1,0 +1,97 @@
+# Catálogo de dados opcional (Amundsen). Sobe junto com a pilha principal:
+#   docker compose -f docker-compose.yml -f docker-compose.amundsen.yml up -d
+# Depois que o DAG rodar, carregue o catálogo:
+#   docker compose -f docker-compose.yml -f docker-compose.amundsen.yml run --rm amundsen-loader
+# As imagens oficiais do Amundsen só existem para amd64; em Apple Silicon rodam emuladas.
+services:
+  neo4j:
+    # 4.4 tem imagem nativa para ARM; a 3.5 (padrão do Amundsen) só existe em amd64
+    image: neo4j:4.4
+    environment:
+      NEO4J_AUTH: neo4j/amundsen
+      NEO4J_dbms_memory_heap_max__size: 512m
+      NEO4J_dbms_memory_pagecache_size: 256m
+    ports:
+      - "7687:7687"
+    volumes:
+      - neo4jdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:7474 || exit 1"]
+      interval: 10s
+      retries: 30
+      start_period: 60s
+
+  elasticsearch:
+    image: elasticsearch:8.0.0
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      retries: 30
+      start_period: 60s
+
+  amundsen-search:
+    image: amundsendev/amundsen-search:4.2.0
+    platform: linux/amd64
+    environment:
+      PROXY_ENDPOINT: elasticsearch
+    command: gunicorn -w 1 --bind :5000 search_service.search_wsgi
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  amundsen-metadata:
+    image: amundsendev/amundsen-metadata:3.13.0
+    platform: linux/amd64
+    environment:
+      PROXY_HOST: bolt://neo4j
+      CREDENTIALS_PROXY_USER: neo4j
+      CREDENTIALS_PROXY_PASSWORD: amundsen
+      # o Neo4j 4.x não usa TLS por padrão; o Amundsen assume conexão criptografada
+      PROXY_ENCRYPTED: "False"
+    command: gunicorn -w 1 --bind :5000 metadata_service.metadata_wsgi
+    depends_on:
+      neo4j:
+        condition: service_healthy
+
+  amundsen-frontend:
+    image: amundsendev/amundsen-frontend:4.3.0
+    platform: linux/amd64
+    environment:
+      SEARCHSERVICE_BASE: http://amundsen-search:5000
+      METADATASERVICE_BASE: http://amundsen-metadata:5000
+      FRONTEND_SVC_CONFIG_MODULE_CLASS: amundsen_application.config.TestConfig
+    command: gunicorn -w 1 --bind :5000 amundsen_application.wsgi
+    ports:
+      # 5000 é usada pelo AirPlay no macOS
+      - "5005:5000"
+    depends_on:
+      - amundsen-search
+      - amundsen-metadata
+
+  # Executa uma vez: publica os modelos do dbt no Amundsen.
+  amundsen-loader:
+    build: docker/amundsen
+    # só roda sob demanda (`docker compose ... run --rm amundsen-loader`), depois do DAG
+    profiles: ["loader"]
+    environment:
+      NEO4J_PASSWORD: amundsen
+    command: ["python", "/app/load_catalog.py"]
+    volumes:
+      - ./amundsen:/app:ro
+      - dbt_artifacts:/dbt-artifacts:ro
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  neo4jdata:
+  esdata:

@@ -1,4 +1,4 @@
-# Mercado de trabalho por UF — ELT com pandas, dbt, Airflow e Superset
+# Mercado de trabalho por UF — ELT com pandas, dbt, Airflow, Superset e Amundsen
 
 Pipeline ELT que baixa indicadores da PNAD Contínua (IBGE) para as 27 unidades da
 federação, modela os dados com dbt e publica um dashboard no Superset. Tudo sobe com
@@ -27,6 +27,7 @@ flowchart LR
 | Transformação e testes de dados | dbt (Postgres) | `dbt/` |
 | Orquestração | Apache Airflow 3 | `dags/mercado_trabalho_elt.py` |
 | Visualização | Apache Superset 6 | `superset/bootstrap_dashboard.py` |
+| Catálogo de dados (opcional) | Amundsen | `docker-compose.amundsen.yml`, `amundsen/load_catalog.py` |
 
 **Dados:** duas séries trimestrais do SIDRA, de 2012 em diante, por UF:
 
@@ -46,7 +47,7 @@ docker compose up -d --build
 ```
 
 Na primeira subida o Airflow executa o DAG sozinho (ingestão, `dbt seed`, `dbt run`,
-`dbt test`) e, quando o mart existe, o serviço `superset-bootstrap` cria a conexão, o
+`dbt test`, `dbt docs generate`) e, quando o mart existe, o serviço `superset-bootstrap` cria a conexão, o
 dataset, os oito gráficos e o dashboard pela API do Superset.
 
 | Serviço | Endereço | Acesso |
@@ -60,6 +61,32 @@ da sua máquina.
 
 Para parar a pilha, use o comando `down` do Compose (com a opção de volumes, se quiser
 apagar também os dados).
+
+## Catálogo de dados com Amundsen (opcional)
+
+O Amundsen sobe por um arquivo de Compose separado, porque acrescenta cinco serviços
+(Neo4j, Elasticsearch e os três serviços do Amundsen) e cerca de 2 GB de memória.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.amundsen.yml up -d
+# depois que o DAG terminar:
+docker compose -f docker-compose.yml -f docker-compose.amundsen.yml run --rm amundsen-loader
+```
+
+O carregador lê o `manifest.json` e o `catalog.json` que a tarefa `dbt_docs` do DAG grava
+em um volume compartilhado e publica no Amundsen as tabelas, as colunas, as descrições
+escritas no dbt e a linhagem entre os modelos. A busca fica em http://localhost:5005.
+
+![Tabela do mart no Amundsen](docs/amundsen.jpg)
+
+Notas de compatibilidade:
+
+- As imagens oficiais do Amundsen só existem para amd64 e a mais recente é de março de
+  2024. Em Apple Silicon elas rodam emuladas.
+- O Neo4j usado é o 4.4 (imagem nativa para ARM) no lugar do 3.5 do Compose oficial do
+  Amundsen, que não iniciou sob emulação. Por isso o serviço de metadados roda com
+  `PROXY_ENCRYPTED=False`.
+- O extrator de dbt do Amundsen converte os textos para minúsculas.
 
 ## Desenvolvimento sem o Airflow
 
@@ -107,8 +134,8 @@ uv run ruff check .
   aparelho real.
 - O workflow de CI (`.github/workflows/ci.yml`) está escrito, mas ainda não foi executado
   no GitHub.
-- Catálogo de dados (Amundsen) ainda não faz parte do projeto. Enquanto isso, a
-  documentação e a linhagem dos modelos saem de `dbt docs generate`.
+- No Amundsen, só as colunas descritas no dbt aparecem com descrição, e a carga do
+  catálogo é manual (não é uma tarefa do DAG).
 
 ## Licença
 

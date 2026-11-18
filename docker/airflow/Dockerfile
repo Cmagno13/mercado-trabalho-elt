@@ -11,3 +11,6 @@ RUN pip install --no-cache-dir --constraint "${CONSTRAINTS}" \
 # O dbt fica em um virtualenv separado: as dependências dele conflitam com as do Airflow.
 RUN python -m venv /home/airflow/dbt-venv \
     && /home/airflow/dbt-venv/bin/pip install --no-cache-dir "dbt-postgres>=1.9,<2"
+
+# Destino dos artefatos do dbt (manifest e catalog), compartilhado por um volume.
+RUN mkdir -p /opt/airflow/dbt-artifacts
