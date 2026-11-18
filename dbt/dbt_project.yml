@@ -1,0 +1,20 @@
+name: mercado_trabalho
+version: "1.0.0"
+profile: mercado_trabalho
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+
+models:
+  mercado_trabalho:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts
+
+seeds:
+  mercado_trabalho:
+    +schema: staging

@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: dim_uf
+    description: Unidades da federação com sigla e grande região.
+    columns:
+      - name: uf_codigo
+        description: Código IBGE da UF.
+        data_tests: [unique, not_null]
+      - name: regiao
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["Norte", "Nordeste", "Sudeste", "Sul", "Centro-Oeste"]
+
+  - name: fct_mercado_trabalho_uf_trimestre
+    description: >
+      Uma linha por UF e trimestre com a taxa de desocupação, o rendimento médio real
+      habitual e a variação de cada um contra o mesmo trimestre do ano anterior.
+    columns:
+      - name: uf_trimestre_id
+        description: Chave da linha (código da UF + código do trimestre).
+        data_tests: [unique, not_null]
+      - name: uf_codigo
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_uf')
+                field: uf_codigo
+      - name: ultimo_trimestre
+        description: Verdadeiro nas linhas do trimestre mais recente carregado.
+        data_tests: [not_null]
+      - name: taxa_desocupacao
+        description: Taxa de desocupação em %, pessoas de 14 anos ou mais.
+      - name: rendimento_medio_real
+        description: Rendimento médio mensal real habitual de todos os trabalhos, em R$.
+      - name: taxa_desocupacao_var_anual_pp
+        description: Diferença em pontos percentuais contra o mesmo trimestre do ano anterior.
+      - name: rendimento_medio_real_var_anual_pct
+        description: Variação percentual contra o mesmo trimestre do ano anterior.

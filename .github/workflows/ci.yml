@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: warehouse
+          POSTGRES_PASSWORD: warehouse
+          POSTGRES_DB: warehouse
+        ports:
+          - 5440:5432
+        options: >-
+          --health-cmd "pg_isready -U warehouse"
+          --health-interval 5s
+          --health-retries 20
+    env:
+      WAREHOUSE_URL: postgresql+psycopg2://warehouse:warehouse@localhost:5440/warehouse
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - name: Lint
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Testes (unitários e de integração da carga)
+        run: uv run pytest
+      - name: Ingestão real do SIDRA
+        run: uv run python -m ingestion.sidra
+      - name: dbt build (seed, modelos e testes de dados)
+        working-directory: dbt
+        run: uv run dbt build --profiles-dir .

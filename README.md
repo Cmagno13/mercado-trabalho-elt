@@ -1,0 +1,109 @@
+# Mercado de trabalho por UF — ELT com pandas, dbt, Airflow e Superset
+
+Pipeline ELT que baixa indicadores da PNAD Contínua (IBGE) para as 27 unidades da
+federação, modela os dados com dbt e publica um dashboard no Superset. Tudo sobe com
+um `docker compose up`.
+
+![Dashboard no Superset](docs/dashboard.jpg)
+
+## O que o projeto faz
+
+```mermaid
+flowchart LR
+    A[API SIDRA / IBGE] -->|pandas| B[(raw.sidra_observacoes)]
+    B -->|dbt| C[staging.stg_sidra__observacoes]
+    S[seed uf_regiao] -->|dbt| D
+    C -->|dbt| D[marts.dim_uf]
+    C -->|dbt| E[marts.fct_mercado_trabalho_uf_trimestre]
+    D --> E
+    E --> F[Dashboard no Superset]
+    G[Airflow: mercado_trabalho_elt] -.orquestra.-> B
+    G -.orquestra.-> C
+```
+
+| Etapa | Ferramenta | Onde está |
+| --- | --- | --- |
+| Extração e carga | pandas + SQLAlchemy | `ingestion/sidra.py` |
+| Transformação e testes de dados | dbt (Postgres) | `dbt/` |
+| Orquestração | Apache Airflow 3 | `dags/mercado_trabalho_elt.py` |
+| Visualização | Apache Superset 6 | `superset/bootstrap_dashboard.py` |
+
+**Dados:** duas séries trimestrais do SIDRA, de 2012 em diante, por UF:
+
+- tabela 4099 — taxa de desocupação (%), pessoas de 14 anos ou mais;
+- tabela 5436 — rendimento médio mensal real habitual de todos os trabalhos (R$).
+
+O mart `fct_mercado_trabalho_uf_trimestre` tem uma linha por UF e trimestre, com os dois
+indicadores e a variação de cada um contra o mesmo trimestre do ano anterior.
+
+## Como rodar
+
+Requisitos: Docker com Compose e cerca de 4 GB de disco para as imagens.
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Na primeira subida o Airflow executa o DAG sozinho (ingestão, `dbt seed`, `dbt run`,
+`dbt test`) e, quando o mart existe, o serviço `superset-bootstrap` cria a conexão, o
+dataset, os seis gráficos e o dashboard pela API do Superset.
+
+| Serviço | Endereço | Acesso |
+| --- | --- | --- |
+| Airflow | http://localhost:8081 | sem login (modo demonstração) |
+| Superset | http://localhost:8089/superset/dashboard/mercado-trabalho-uf/ | `admin` / `admin` |
+| Postgres (warehouse) | `localhost:5440`, banco `warehouse` | `warehouse` / `warehouse` |
+
+As credenciais são de demonstração e vêm do `.env`. Não exponha essa configuração fora
+da sua máquina.
+
+Para parar a pilha, use o comando `down` do Compose (com a opção de volumes, se quiser
+apagar também os dados).
+
+## Desenvolvimento sem o Airflow
+
+```bash
+uv sync
+docker compose up -d postgres
+export WAREHOUSE_URL=postgresql+psycopg2://warehouse:warehouse@localhost:5440/warehouse
+uv run python -m ingestion.sidra
+cd dbt && uv run dbt build --profiles-dir .
+```
+
+Testes e lint:
+
+```bash
+uv run pytest        # o teste de integração da carga só roda com WAREHOUSE_URL definido
+uv run ruff check .
+```
+
+## Decisões de projeto
+
+- **Carga completa, não incremental.** As séries são pequenas (2.970 linhas na carga de
+  18/11/2026) e o IBGE revisa valores passados; substituir o conteúdo a cada execução é
+  mais simples e evita divergência.
+- **`TRUNCATE` + `INSERT` na tabela bruta.** Recriar a tabela falha na segunda execução,
+  porque a view de staging do dbt depende dela. Há um teste de integração cobrindo isso.
+- **dbt em um virtualenv separado dentro da imagem do Airflow.** As dependências do dbt
+  conflitam com as do Airflow.
+- **Dashboard como código.** Os gráficos são criados pela API REST do Superset, com
+  tipos nativos, e o script pode ser executado mais de uma vez.
+- **Qualidade de dados no dbt.** Testes de chave única, integridade entre fato e
+  dimensão, valores aceitos, taxa entre 0 e 100 e presença das 27 UFs.
+
+## Limitações
+
+- As médias por região no dashboard são **médias simples das UFs**, não a taxa oficial da
+  região (que é ponderada pela população). Os títulos dos gráficos dizem isso.
+- Um único Postgres guarda o warehouse e os metadados do Airflow e do Superset. Serve
+  para demonstração, não para produção.
+- O Airflow roda em modo `standalone`, sem autenticação.
+- O workflow de CI (`.github/workflows/ci.yml`) está escrito, mas ainda não foi executado
+  no GitHub.
+- Catálogo de dados (Amundsen) ainda não faz parte do projeto. Enquanto isso, a
+  documentação e a linhagem dos modelos saem de `dbt docs generate`.
+
+## Licença
+
+MIT.

@@ -1,0 +1,23 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Dados brutos carregados pela ingestão em pandas (ingestion/sidra.py).
+    schema: raw
+    tables:
+      - name: sidra_observacoes
+        description: Uma linha por indicador, UF e trimestre, como devolvido pelo SIDRA/IBGE.
+        loaded_at_field: carregado_em
+        freshness:
+          warn_after: {count: 8, period: day}
+        columns:
+          - name: indicador
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ["taxa_desocupacao", "rendimento_medio_real"]
+          - name: uf_codigo
+            data_tests: [not_null]
+          - name: trimestre_codigo
+            data_tests: [not_null]

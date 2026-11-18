@@ -1,0 +1,22 @@
+[project]
+name = "mercado-trabalho-elt"
+version = "0.1.0"
+description = "ELT do mercado de trabalho brasileiro (PNAD Contínua): pandas, dbt, Airflow e Superset"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pandas>=2.2",
+    "requests>=2.32",
+    "sqlalchemy>=2.0",
+    "psycopg2-binary>=2.9",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "dbt-postgres>=1.9"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["dbt/target", "dbt/dbt_packages"]

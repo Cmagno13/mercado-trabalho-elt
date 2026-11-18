@@ -1,0 +1,23 @@
+version: 2
+
+models:
+  - name: stg_sidra__observacoes
+    description: Observações do SIDRA tipadas, com ano, trimestre e data de início do trimestre.
+    columns:
+      - name: trimestre
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4]
+                quote: false
+      - name: valor
+        data_tests: [not_null]
+
+seeds:
+  - name: uf_regiao
+    description: Sigla e grande região de cada unidade da federação (código IBGE).
+    columns:
+      - name: uf_codigo
+        data_tests: [unique, not_null]
+      - name: uf_sigla
+        data_tests: [unique, not_null]
